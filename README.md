@@ -1,5 +1,4 @@
 # Concurrent Data Structures
-### Java Implementations of Concurrent Data Structures
 
 ## Included Algorithms
 ### Persistent Non-Blocking Binary Search Tree (PNB-BST)
