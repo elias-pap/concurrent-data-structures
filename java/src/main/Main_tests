@@ -1,0 +1,423 @@
+/**
+ * Java test harness for throughput experiments on concurrent data structures.
+ * Copyright (C) 2012 Trevor Brown
+ * Copyright (C) 2019 Elias Papavasileiou
+ * Contact (me [at] tbrown [dot] pro) with any questions or comments.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package main;
+
+import org.deuce.transform.Exclude;
+
+import adapters.*;
+import main.support.*;
+import java.io.*;
+import java.lang.management.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.Scanner;
+import java.util.TreeMap;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
+
+@Exclude
+public class Main {
+
+    // factory classes for each supported data structure
+
+    protected static abstract class TreeFactory<K> {
+        public abstract SetInterface<K> newTree(final Object param);
+        public abstract String getName();
+    }
+
+    @Exclude
+    protected static class LockFreeChromaticFactory<K> extends TreeFactory<K> {
+        Object param;
+        public SetInterface<K> newTree(final Object param) {
+            this.param = param;
+            if ("".equals(param.toString()) || param == null) {
+                return new LockFreeChromaticAdapter();
+            }
+            return new LockFreeChromaticAdapter(Integer.parseInt(param.toString()));
+        }
+        public String getName() { return "Chromatic"; }
+    }
+
+    @Exclude
+    protected static class LockFreeBSlackTreeFactory<K> extends TreeFactory<K> {
+        Object param;
+        public SetInterface<K> newTree(final Object param) {
+            this.param = param;
+            if ("".equals(param.toString()) || param == null) {
+                return new LockFreeBSlackTreeAdapter();
+            }
+            return new LockFreeBSlackTreeAdapter(Integer.parseInt(param.toString()));
+        }
+        public String getName() { return "ConcurrentBSlack"; }
+    }
+
+    @Exclude
+    protected static class SkipListDeuceSTMFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new SkipListDeuceSTMAdapter(1.0);
+        }
+        public String getName() { return "SkipListSTM"; }
+    }
+
+    @Exclude
+    protected static class RBTreeDeuceSTMFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new RBTreeDeuceSTMAdapter(1.0);
+        }
+        public String getName() { return "RBSTM"; }
+    }
+
+    @Exclude
+    protected static class RBTreeCoarseLockFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new RBTreeCoarseLockAdapter(1.0);
+        }
+        public String getName() { return "RBLock"; }
+    }
+
+    @Exclude
+    protected static class RBTreeUnsyncFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new RBTreeUnsyncAdapter(1.0);
+        }
+        public String getName() { return "RBUnsync"; }
+    }
+
+    @Exclude
+    protected static class DummyFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new DummyAdapter(1.0);
+        }
+        public String getName() { return "Dummy"; }
+    }
+
+    @Exclude
+    protected static class LockFreeAVLFactory<K> extends TreeFactory<K> {
+        Object param;
+        public SetInterface<K> newTree(final Object param) {
+            this.param = param;
+            if ("".equals(param.toString()) || param == null) {
+                return new LockFreeAVLAdapter();
+            }
+            return new LockFreeAVLAdapter(Integer.parseInt(param.toString()));
+        }
+        public String getName() { return "LockFreeAVL"; }
+    }
+
+    @Exclude
+    protected static class LockFree4STFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new LockFree4STAdapter();
+        }
+        public String getName() { return "4-ST"; }
+    }
+
+    @Exclude
+    protected static class LockFreeKSTRQFactory<K> extends TreeFactory<K> {
+        Object param;
+        public SetInterface<K> newTree(final Object param) {
+            this.param = param;
+            //System.out.println("this.param: " + this.param);
+            return new LockFreeKSTRQAdapter(Integer.parseInt(param.toString()));
+        }
+        //public String getName() { return "KST" + (this.param != null ? this.param.toString() : ""); }
+        public String getName() { return "KST" + this.param.toString(); }
+    }
+
+    @Exclude
+    protected static class OptTreeFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new OptTreeAdapter();
+        }
+        public String getName() { return "AVL"; }
+    }
+
+    @Exclude
+    protected static class SnapTreeFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new SnapTreeAdapter();
+        }
+        public String getName() { return "Snap"; }
+    }
+
+    @Exclude
+    protected static class SkipListFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new ConcurrentSkipListMapAdapter();
+        }
+        public String getName() { return "SkipList"; }
+    }
+
+    @Exclude
+    protected static class ConcurrentHashMapFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new ConcurrentHashMapAdapter();
+        }
+        public String getName() { return "ConcurrentHMAP"; }
+    }
+
+    @Exclude
+    protected static class SkipTreeFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new SkipTreeAdapter();
+        }
+        public String getName() { return "SkipTree"; }
+    }
+
+    @Exclude
+    protected static class Ctrie2Factory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new Ctrie2Adapter();
+        }
+        public String getName() { return "Ctrie"; }
+    }
+
+    @Exclude
+    protected static class StaticDictionary5Factory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new LockFreeBSTAdapter();
+        }
+        public String getName() { return "BST"; }
+    }
+
+    @Exclude
+    protected static class LockFreePBSTFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new LockFreePBSTAdapter();
+        }
+        public String getName() { return "PBST"; }
+    }
+
+    @Exclude
+    protected static class LockFreeBPBSTFactory<K> extends TreeFactory<K> {
+        Object param;
+        public SetInterface<K> newTree(final Object param) {
+            this.param = param;
+            return param.toString().isEmpty() ? new LockFreeBPBSTAdapter()
+                                              : new LockFreeBPBSTAdapter(Integer.parseInt(param.toString()));
+        }
+        public String getName() { return "BPBST" + this.param.toString(); }
+    }
+
+    @Exclude
+    protected static class LockFreeImmTreapCATreeMapSTDRFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new LockFreeImmTreapCATreeMapSTDRAdapter();
+        }
+        public String getName() { return "LFCA"; }
+    }
+
+    @Exclude
+    protected static class KIWIFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new KiWiAdapter();
+        }
+        public String getName() { return "KIWI"; }
+    }
+
+    @Exclude
+    protected static class FastBSTFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new FastBSTAdapter();
+        }
+        public String getName() { return "FBST"; }
+    }
+
+    @Exclude
+    protected static class SyncTreeMapFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new SyncTreeMapAdapter();
+        }
+        public String getName() { return "SyncTMAP"; }
+    }
+
+    @Exclude
+    protected static class TreeMapFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new TreeMapAdapter();
+        }
+        public String getName() { return "TMAP"; }
+    }
+
+    @Exclude
+    protected static class HashMapFactory<K> extends TreeFactory<K> {
+        public SetInterface<K> newTree(final Object param) {
+            return new HashMapAdapter();
+        }
+        public String getName() { return "HMAP"; }
+    }
+
+	/*static class MyInsertThread extends Thread {
+		private LockFreePBSTAdapter<Integer> tree;
+
+		public MyInsertThread(LockFreePBSTAdapter<Integer> tree) {
+			this.tree = tree;
+		}
+
+		public void run() {
+			tree.add(10, null);
+		}
+	}
+
+	static class MyDeleteThread extends Thread {
+		private LockFreePBSTAdapter<Integer> tree;
+
+		public MyDeleteThread(LockFreePBSTAdapter<Integer> tree) {
+			this.tree = tree;
+		}
+
+		public void run() {
+			for (int i=0; i<3; i++) {
+				tree.remove(10, null);
+			}
+		}
+	}*/
+
+    static void InsertDeleteOneKey(AbstractAdapter<Integer> tree) {
+        assert tree.add(10, null);
+        assert !tree.add(10, null);
+        assert tree.remove(10, null);
+        assert !tree.remove(10, null);
+        System.out.println(new Object(){}.getClass().getEnclosingMethod().getName() + ": OK");
+    }
+
+    static void InsertDeleteTwoKeys(AbstractAdapter<Integer> tree) {
+        assert tree.add(10, null);
+        assert tree.add(15, null);
+        assert !tree.add(10, null);
+        assert !tree.add(15, null);
+        assert tree.remove(10, null);
+        assert !tree.remove(10, null);
+        assert tree.remove(15, null);
+        assert !tree.remove(15, null);
+        System.out.println(new Object(){}.getClass().getEnclosingMethod().getName() + ": OK");
+    }
+
+    static void InsertDeleteQuery(AbstractAdapter<Integer> tree) {
+        int keysInTree = 0;
+        int key1 = 11, key2 = 20, key3 = 30;
+        assert ((Object[]) tree.rangeQuery(1, 100, 0, null)).length == keysInTree;
+        assert !tree.remove(key1, null);
+        assert tree.add(key1, null);
+        keysInTree++;
+        assert tree.add(key3, null);
+        keysInTree++;
+        assert tree.add(key2, null);
+        keysInTree++;
+        assert ((Object[]) tree.rangeQuery(1, 100, 0, null)).length == keysInTree;
+        //System.out.println("RQResult length: " + ((Object[]) tree.rangeQuery(1, 100, 0, null)).length);
+        //assert tree.remove(key1, null);
+        //assert !tree.contains(key1);
+        assert tree.remove(key1, null);
+        keysInTree--;
+        assert !tree.contains(key1);
+        //System.out.println("RQResult length: " + ((Object[]) tree.rangeQuery(1, 100, 0, null)).length);
+        assert ((Object[]) tree.rangeQuery(1, 100, 0, null)).length == keysInTree;
+        assert !tree.contains(key1);
+        assert tree.contains(key2);
+        assert tree.contains(key3);
+        assert !tree.remove(key1, null);
+        assert tree.contains(key2);
+        assert tree.contains(key3);
+        assert ((Object[]) tree.rangeQuery(key2, key3-1, 0, null)).length == keysInTree-1;
+        assert ((Object[]) tree.rangeQuery(key2, key3, 0, null)).length == keysInTree;
+        assert ((Object[]) tree.rangeQuery(key2, key3+1, 0, null)).length == keysInTree;
+        assert tree.remove(key2, null);
+        keysInTree--;
+        assert tree.remove(key3, null);
+        keysInTree--;
+        System.out.println(new Object(){}.getClass().getEnclosingMethod().getName() + ": OK");
+    }
+
+    static void InsertDeleteQuery2(AbstractAdapter<Integer> tree) {
+        int keysInTree = 0;
+        assert ((Object[]) tree.rangeQuery(1, 100, 0, null)).length == keysInTree;
+        assert !tree.contains(10);
+        assert ((Object[]) tree.rangeQuery(1, 100, 0, null)).length == keysInTree;
+        assert tree.add(10, null);
+        keysInTree++;
+        assert tree.add(15, null);
+        keysInTree++;
+        assert ((Object[]) tree.rangeQuery(1, 100, 0, null)).length == keysInTree;
+        assert tree.remove(15, null);
+        keysInTree--;
+        assert !tree.remove(15, null);
+        assert ((Object[]) tree.rangeQuery(1, 100, 0, null)).length == keysInTree;
+        assert !tree.contains(15);
+		assert ((Object[]) tree.rangeQuery(1, 1000000000, 0, null)).length == keysInTree;
+        assert tree.add(5, null);
+        keysInTree++;
+        assert tree.remove(5, null);
+        keysInTree--;
+        assert ((Object[]) tree.rangeQuery(1, 100, 0, null)).length == keysInTree;
+		assert tree.add(20, null);
+        keysInTree++;
+		assert tree.add(15, null);
+        keysInTree++;
+		assert tree.add(25, null);
+        keysInTree++;
+		assert !tree.remove(5, null);
+		assert ((Object[]) tree.rangeQuery(1, 100, 0, null)).length == keysInTree;
+		assert tree.remove(25, null);
+        keysInTree--;
+		assert ((Object[]) tree.rangeQuery(1, 100, 0, null)).length == keysInTree;
+        assert ((Object[]) tree.rangeQuery(1, 10, 0, null)).length == keysInTree-2;
+        assert ((Object[]) tree.rangeQuery(1, 14, 0, null)).length == keysInTree-2;
+        assert ((Object[]) tree.rangeQuery(1, 15, 0, null)).length == keysInTree-1;
+        assert ((Object[]) tree.rangeQuery(1, 16, 0, null)).length == keysInTree-1;
+        System.out.println(new Object(){}.getClass().getEnclosingMethod().getName() + ": OK");
+    }
+
+    private static void runTests(AbstractAdapter<Integer> tree) {
+        InsertDeleteOneKey(tree);
+        InsertDeleteTwoKeys(tree);
+        InsertDeleteQuery(tree);
+        InsertDeleteQuery2(tree);
+    }
+
+    public static void main(String[] args) {
+
+        final ArrayList<TreeFactory<Integer>> factories = new ArrayList<TreeFactory<Integer>>();
+        factories.add(new LockFreePBSTFactory<Integer>());
+        factories.add(new LockFreeImmTreapCATreeMapSTDRFactory<Integer>());
+        //factories.add(new LockFreeKSTRQFactory<Integer>());
+        factories.add(new LockFreeBPBSTFactory<Integer>());
+        factories.add(new KIWIFactory<Integer>());
+
+        Object treeParam = 64;
+
+        // Run tests
+        for (TreeFactory<Integer> tree : factories) {
+            AbstractAdapter<Integer> treeAdapter = (AbstractAdapter<Integer>) tree.newTree(treeParam);
+            System.out.println("[*] Testing " + tree.getName() + " ...");
+            runTests(treeAdapter);
+        }
+
+        /*MyInsertThread t1 = new MyInsertThread(tree);
+		MyDeleteThread t2 = new MyDeleteThread(tree);
+		t1.start();
+		t2.start();
+		try { t1.join(); } catch (Exception e) { System.out.println("Insert Exception !"); }
+		try { t2.join(); } catch (Exception e) { System.out.println("Delete Exception !"); }
+		tree.size();*/
+    }
+}

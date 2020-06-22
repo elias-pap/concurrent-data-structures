@@ -1,0 +1,37 @@
+#!/bin/sh
+
+rm -r -f build
+mkdir build
+
+######## ENTER PATH TO YOUR JAVA, JAVAC AND JAR BINARIES HERE
+java="java"
+javac="javac"
+jar="jar"
+
+echo "COMPILING JAVA CLASSES..."
+
+cmd="$javac -g -d build -classpath lib/ctries2.jar:lib/deuceAgent.jar:lib/scala-library.jar `find . -name *.java`"
+#cmd="$javac -nowarn -d build -classpath lib/ctries2.jar:lib/deuceAgent.jar:lib/scala-library.jar `find . -name *.java`"
+#cmd="$javac -d build -classpath lib/ctries2.jar:lib/deuceAgent.jar:lib/scala-library.jar `find . -name *.java`"
+#cmd="$javac -d build -classpath lib/ctries2.jar:lib/deuceAgent.jar:lib/scala-library.jar src/algorithms/published/LockFreeBSTMap.java"
+#cmd="$javac -d build -classpath lib/ctries2.jar:lib/scala-library.jar src/algorithms/published/LockFreeBSTMap.java src/main/*.java src/main/support/*.java src/adapters/LockFreeBSTAdapter.java"
+echo $cmd
+$cmd
+
+if [ "$?" -eq "0" ]; then
+	cd build
+	echo "BUILDING JAR FILE (with manifest)..."
+	echo "Main-class: main.Main" > manifest.mf
+	$jar cfm experiments.jar manifest.mf *
+
+	if [ "$?" -eq "0" ]; then
+		cd ../lib
+		echo "INSTRUMENTING JAR FILE WITH STM SUPPORT..."
+		#$java -jar deuceAgent.jar ../build/experiments.jar ../build/experiments_instr.jar
+		cp ../build/experiments.jar ../build/experiments_instr.jar
+		cd ..
+	fi
+	echo "DONE."
+else
+	echo "ERROR compiling."
+fi
