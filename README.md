@@ -1,14 +1,12 @@
 # Concurrent Data Structures
 
 ## Original Implementations
-### Persistent Non-Blocking Binary Search Tree (PNB-BST)
-(LockFreePBSTMap.java)  
+### Persistent Non-Blocking Binary Search Tree ([PNB-BST](https://github.com/elias-pap/concurrent-data-structures/blob/master/java/src/algorithms/published/LockFreePBSTMap.java))
 This is an implementation of PNB-BST algorithm described in the paper
 "Persistent Non-Blocking Binary Search Trees Supporting Wait-Free Range Queries"
 of Panagiota Fatourou, Elias Papavasileiou and Eric Ruppert.
 
-### Batched Persistent Non-Blocking Binary Search Tree (BPNB-BST)
-(LockFreeBPBSTMap.java)  
+### Batched Persistent Non-Blocking Binary Search Tree ([BPNB-BST](https://github.com/elias-pap/concurrent-data-structures/blob/master/java/src/algorithms/published/LockFreeBPBSTMap.java))
 This is an optimized version of PNB-BST algorithm that supports key batching in the leafs.
 
 # Benchmark suite
@@ -58,7 +56,7 @@ Many different versions of the same file are included in some cases. Usually, th
 	Gnuplot script that plots the memory usage over time.
 
 	- README.txt
-	Useful README file provided by Trevor Brown. The original version can be found here: https://bitbucket.org/trbot86/implementations/src/master/java/README.txt
+	Useful README file provided by Trevor Brown.
 
 	- run-experiments*
 	Scripts used to run the experiments. Memory usage and cache misses are measured with these scripts as well.

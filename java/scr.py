@@ -3,7 +3,7 @@ import csv, time
 from os import system
 from sys import argv
 
-### THIS IS A HACKY SCRIPT THAT SHOULD BE REWRITTEN ###
+### THIS IS A HACKY SCRIPT THAT NEEDS TO BE REWRITTEN ###
 
 if len(argv) < 5:
 	print('Usage: ' + argv[0] + ' exp_type num_of_x_values num_of_algorithms exp_name')
